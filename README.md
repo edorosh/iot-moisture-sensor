@@ -1,5 +1,5 @@
 # MQTT Soil Moisure Sensor
-Monitors periodically soil moisture level and sends JSON data to MQTT server. Tested on NodeMCU V3.
+Monitors periodically soil moisture level and sends sensor data as string to MQTT server. Tested on NodeMCU V3 and Wemos D1 mini.
 ESP8266 chip enters sleep mode to save extra eneregy for a battery powered devices.
 
 # Circuit

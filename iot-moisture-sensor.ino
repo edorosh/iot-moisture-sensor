@@ -1,7 +1,7 @@
 /**
  * MQTT Soil Moisture Sensor
  * 
- * Monitors periodically soil moisture level and sends JSON data to MQTT server. Tested on NodeMCU V3.
+ * Monitors periodically soil moisture level and sends sensor data as string to MQTT server.
  * ESP8266 chip enters sleep mode to save extra eneregy for a battery powered devices.
  * 
  * Author: Evgeny Doros
@@ -44,18 +44,20 @@ IPAddress GATEWAY_CONFIG;
 IPAddress SUBNET_CONFIG; 
 
 // Global variable keeping deep sleep setting. Might change during the programm flow
+// TODO: refactor it by RUNTIME MOD enum
 bool DEEP_SLEEP_enabled = false;
 
+// todo: replace timing vars by a Timout library
 // Generally, you should use "unsigned long" for variables that hold time
 // The value will quickly become too large for an int to store
-unsigned long previousMillis = 0;    // will store last time Soil Sensor was updated
+unsigned long previousMs = 0;    // will store last time Soil Sensor was updated
 
 // Timeout before publishing and going into sleep mode in deep sleep mode. This timout is required to be able
 // to get MQTT message to switch sleep mode off
-unsigned long previousDSMillis = 0;   
-const long intervalDS = 1e3; 
+unsigned long previousDeepSleepMs = 0;   
 
 // Sensor value
+//todo: get rid of global variable
 float moistureLevel = .0;
 
 /**
@@ -71,13 +73,13 @@ void enterDeepSleepMode()
   }
 
   DPRINTLNF("Entering a deep sleep mode");
-  deepSleep(DEEP_SLEEP_MICRO_SECONDS);
+  deepSleep(DEEP_SLEEP_MS);
 }
 
 /** Open Serial port for debugging purposes. */
 inline void beginSerial()
 {
-  initSerial(SERIAL_SPEED_BAUD, SERIAL_TIMEOUT_MICRO_SECONDS);
+  initSerial(SERIAL_SPEED_BAUD, SERIAL_TIMEOUT_MS);
   Serial.println(F("Booting..."));
 }
 
@@ -94,14 +96,15 @@ inline void connectToWiFi()
   WiFi.mode(WIFI_STA);
   WiFi.begin(STASSID, STAPSK);
   WiFi.config(ip, gateway, subnet);
+  WiFi.hostname(STAHOSTNAME);
 
   DPRINTFF("Connecting to WiFi network ");
   DPRINTLN(STASSID);
 
   while (WiFi.waitForConnectResult() != WL_CONNECTED)
   {
-    DPRINTLNF("Connection Failed! Restarting in 500ms...");
-    delay(500);
+    DPRINTLNF("Connection Failed! Restarting with delay...");
+    delay(WIFI_RECONNECT_ON_FAILURE_MS);
     ESP.restart();
   }
 
@@ -146,13 +149,14 @@ inline void connectToMQTT()
       DPRINTLNF(" try again in 5 seconds");
 
       // Wait some time before retrying
-      delay(CONNECT_MQTT_TIMEOUT_MICRO_SECONDS);
+      delay(CONNECT_MQTT_TIMEOUT_MS);
     }
   }
 }
 
 void publishSensorsData()
 {
+  //todo: get rid of global variable
   if (!client.publish(MQTT_VALUE_TOPIC, String(moistureLevel).c_str(), true)) {
     DPRINTLNF("Sending message to MQTT failed");
   }
@@ -160,8 +164,19 @@ void publishSensorsData()
 
 bool readSensorsData()
 {
-   // read sensor raw value
-  moistureLevel = analogRead(A0); // / 1023.0f;
+  int measurements[NUMBER_OF_MEASUREMENTS];
+  float accum = .0;
+
+  for (int i=0; i < NUMBER_OF_MEASUREMENTS; i++) {
+    // read sensor raw value
+    measurements[i] = analogRead(A0); // / 1023.0f;
+    delay(DELAY_BETWEEN_MEASUREMENTS_MS);
+  }
+  
+  for (int i=0; i < NUMBER_OF_MEASUREMENTS; i++) {
+    accum += measurements[i];
+  }
+  moistureLevel = accum /NUMBER_OF_MEASUREMENTS;
 
   DPRINTFF("Moisture: ");
   DPRINTLN(moistureLevel);
@@ -205,10 +220,10 @@ void callback(char* topic, byte* payload, unsigned int length) {
 inline void setupOTA()
 {
   DPRINT("Enabling OTA with hostname ");
-  DPRINTLN(OTAHOSTNAME);
+  DPRINTLN(STAHOSTNAME);
 
   // Hostname defaults to esp8266-[ChipID]
-  ArduinoOTA.setHostname(OTAHOSTNAME);
+  ArduinoOTA.setHostname(STAHOSTNAME);
 
   // Password can be set with it's md5 value as well
   // MD5(admin) = 21232f297a57a5a743894a0e4a801fc3
@@ -269,7 +284,7 @@ void setup()
 #ifdef DEBUG
   beginSerial();
   DPRINTLN("");
-  DPRINT(F("Sketch starting: iot-weather-station "));
+  DPRINT(F("Sketch starting: iot-moisture-sensor "));
   DPRINTLN(FW_VERSION);
   DPRINT(F("Reset reason: "));
   DPRINTLN(ESP.getResetReason());
@@ -297,7 +312,7 @@ void setup()
   if (DEEP_SLEEP_enabled)
   {
     // Let the sensor to initialize itself
-    delay(DHT_INITIALIZE_TIMEOUT_MICRO_SECONDS);
+    delay(DHT_INITIALIZE_TIMEOUT_MS);
     readSensorsData();
     powerBusOff();
   }
@@ -310,7 +325,7 @@ void setup()
 
   setupOTA();
 
-  previousDSMillis = millis();
+  previousDeepSleepMs = millis();
 }
 
 void loop()
@@ -319,8 +334,8 @@ void loop()
   
   if (DEEP_SLEEP_enabled)
   {
-    unsigned long currentMillis = millis();
-    if (currentMillis - previousDSMillis >= START_STATION_TIMEOUT_IN_SLEEP_MODE)
+    unsigned long currentMs = millis();
+    if (currentMs - previousDeepSleepMs >= START_STATION_TIMEOUT_IN_SLEEP_MODE_MS)
     {
       publishSensorsData();
       enterDeepSleepMode();
@@ -335,11 +350,11 @@ void loop()
 
   ArduinoOTA.handle();
   
-  unsigned long currentMillis = millis();
-  if (currentMillis - previousMillis >= DHT_READ_INTERVAL_NON_SLEEP_MODE)
+  unsigned long currentMs = millis();
+  if (currentMs - previousMs >= DHT_READ_INTERVAL_NON_SLEEP_MODE_MS)
   {
     // save the last time you updated the DHT values
-    previousMillis = currentMillis;
+    previousMs = currentMs;
 
     readSensorsData();
     publishSensorsData();
