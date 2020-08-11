@@ -1,0 +1,39 @@
+// Print debug logs to Serial {TRUE/FALSE}
+#define DEBUG TRUE
+
+#define OTAHOSTNAME "esp8266-moisture-sensor-01"
+
+// WiFi Network configuration
+#define STASSID ""
+#define STAPSK ""
+
+// Static network configuration
+#define IPADDRESS_CONFIG ip(192, 168, 0, 101)
+#define GATEWAY_CONFIG gateway(192, 168, 0, 1)
+// Network mask
+#define SUBNET_CONFIG subnet(255, 255, 255, 0)
+
+// MQTT server configuration
+#define MQTTSERVER "192.168.0.54"
+#define MQTTPORT 1883
+#define MQTT_CLIENT_NAME "arduino_moisture_sensor_01"
+#define CONNECT_MQTT_TIMEOUT_MICRO_SECONDS 5e3
+
+// wait timeout in micro seconds to let Moisture sensor booting after being powered on
+#define DHT_INITIALIZE_TIMEOUT_MICRO_SECONDS 500
+
+// Digital pin connected to the base of PNP transistor
+#define DHT_KEY_PIN 12
+
+#define DEEP_SLEEP_MICRO_SECONDS 600e3
+#define SERIAL_SPEED_BAUD 115200
+#define SERIAL_TIMEOUT_MICRO_SECONDS 200
+
+#define DEEP_SLEEP_TOPIC "device/name/moistureSensor01/deepSleep"
+#define MQTT_VALUE_TOPIC "moistureSensor01/level"
+
+// Updates Moisture Sensor readings every X micro seconds when in NON deep sleep mode
+#define DHT_READ_INTERVAL_NON_SLEEP_MODE 5e3
+// Timeout before publishing sensors data and going into sleep mode in deep sleep mode. 
+// This timout is required to be able to get MQTT message to switch sleep mode off
+#define START_STATION_TIMEOUT_IN_SLEEP_MODE 1500
