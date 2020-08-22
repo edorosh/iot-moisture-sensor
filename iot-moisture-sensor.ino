@@ -24,6 +24,8 @@
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
 #include <EEPROM.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
 
 #include "DeepSleep.h"
 #include "Serial.h"
@@ -41,7 +43,15 @@ PubSubClient client(espClient);
 // static IP address of device
 IPAddress IPADDRESS_CONFIG;  
 IPAddress GATEWAY_CONFIG;
-IPAddress SUBNET_CONFIG; 
+IPAddress SUBNET_CONFIG;
+
+#ifdef TEMP_SENSOR_ON
+// Setup a oneWire instance to communicate with any OneWire devices
+OneWire oneWire(TEMP_SENSOR_PIN);
+
+// Pass our oneWire reference to Dallas Temperature sensor 
+DallasTemperature sensors(&oneWire);
+#endif
 
 // Global variable keeping deep sleep setting. Might change during the programm flow
 // TODO: refactor it by RUNTIME MOD enum
@@ -58,7 +68,7 @@ unsigned long previousDeepSleepMs = 0;
 
 // Sensor value
 //todo: get rid of global variable
-float moistureLevel = .0;
+float moistureLevel = .0, temperatureC = .0;
 
 /**
  * Closes all network clients and sends the chip into Deep Sleep Mode with WAKE_RF_DEFAULT.
@@ -158,8 +168,14 @@ void publishSensorsData()
 {
   //todo: get rid of global variable
   if (!client.publish(MQTT_VALUE_TOPIC, String(moistureLevel).c_str(), true)) {
-    DPRINTLNF("Sending message to MQTT failed");
+    DPRINTLNF("Sending moisture level to MQTT failed");
   }
+
+#ifdef TEMP_SENSOR_ON
+  if (!client.publish(MQTT_TEMP_TOPIC, String(temperatureC).c_str(), true)) {
+    DPRINTLNF("Sending temperature to MQTT failed");
+  }
+#endif
 }
 
 bool readSensorsData()
@@ -180,6 +196,15 @@ bool readSensorsData()
 
   DPRINTFF("Moisture: ");
   DPRINTLN(moistureLevel);
+
+#ifdef TEMP_SENSOR_ON
+  yield();
+  sensors.requestTemperatures(); 
+  temperatureC = sensors.getTempCByIndex(0);
+
+  DPRINTFF("Temp: ");
+  DPRINTLN(temperatureC);
+#endif
 
   return true;
 }
@@ -307,6 +332,10 @@ void setup()
   EEPROM.begin(EEPROM_SIZE);
   DEEP_SLEEP_enabled = EEPROM.read(0);
 
+#ifdef TEMP_SENSOR_ON
+  // Start the DS18B20 sensor
+  sensors.begin();
+#endif
   powerBusOn();
 
   if (DEEP_SLEEP_enabled)
@@ -331,6 +360,7 @@ void setup()
 void loop()
 {
   client.loop();
+  ArduinoOTA.handle();
   
   if (DEEP_SLEEP_enabled)
   {
@@ -348,8 +378,6 @@ void loop()
     }
   }
 
-  ArduinoOTA.handle();
-  
   unsigned long currentMs = millis();
   if (currentMs - previousMs >= DHT_READ_INTERVAL_NON_SLEEP_MODE_MS)
   {

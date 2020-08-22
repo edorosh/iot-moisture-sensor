@@ -1,5 +1,7 @@
 // Print debug logs to Serial {TRUE/FALSE}
 #define DEBUG TRUE
+// Enable Dallas Temperature {TRUE/FALSE}
+#define TEMP_SENSOR_ON FALSE
 
 // WiFi Network configuration
 #define STAHOSTNAME "esp8266-moisture-sensor-01"
@@ -24,6 +26,7 @@
 
 // Digital pin connected to the base of NPN transistor
 #define DHT_KEY_PIN 12
+#define TEMP_SENSOR_PIN D5
 
 #define DEEP_SLEEP_MS 600e3
 #define SERIAL_SPEED_BAUD 115200
@@ -31,6 +34,7 @@
 
 #define DEEP_SLEEP_TOPIC "device/name/moistureSensor01/deepSleep"
 #define MQTT_VALUE_TOPIC "moistureSensor01/level"
+#define MQTT_TEMP_TOPIC "moistureSensor01/temp"
 
 #define NUMBER_OF_MEASUREMENTS 20
 #define DELAY_BETWEEN_MEASUREMENTS_MS 50
